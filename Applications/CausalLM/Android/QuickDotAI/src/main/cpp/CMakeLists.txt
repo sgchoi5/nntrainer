@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright (C) 2026 Samsung Electronics Co., Ltd. All Rights Reserved.
 #
-# Build the JNI shim against the canonical API header and staged arm64-v8a
-# prebuilts. Gradle packages the JNI library and its dependencies.
+# Build the JNI shim against the canonical API header and staged
+# prebuilts (any ABI). Gradle packages the JNI library and its
+# dependencies.
 cmake_minimum_required(VERSION 3.22.1)
 project(quickai_jni LANGUAGES CXX)
 
@@ -13,7 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CAUSALLM_API_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../api")
 
-# Staged arm64-v8a native libraries.
+# Staged native libraries (ABI determined by Gradle abiFilters).
 set(PREBUILT_LIBS_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../prebuilt_libs")
 

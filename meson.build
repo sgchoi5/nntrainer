@@ -122,7 +122,7 @@ if get_option('platform') == 'windows'
 endif
 
 enable_avxvnni_dispatch = false
-if arch == 'arm' or arch == 'aarch64' or get_option('platform') == 'android'
+if arch == 'arm' or arch == 'aarch64' or (get_option('platform') == 'android' and get_option('target-abi') == 'arm64-v8a')
   message('Build for ARM architecture')
   if arch == 'arm'
     extra_defines += '-DARMV7=1'
@@ -179,7 +179,7 @@ if get_option('enable-fp16')
    if get_option('fp16-impl') != 'auto' and not (arch == 'x86_64' and get_option('platform') != 'android')
      warning('fp16-impl=@0@ is ignored on this build: the option selects the x86_64 fp16 backing type, and this build uses the native __fp16/_Float16.'.format(get_option('fp16-impl')))
    endif
-   if get_option('platform') == 'android'
+   if get_option('platform') == 'android' and get_option('target-abi') == 'arm64-v8a'
      # NDK clang (and non-ARM host compilers used for the meson-built QNN
      # plugin) reject -mfp16-format=ieee; only pass it when supported.
      if cxx.has_argument('-mfp16-format=ieee')

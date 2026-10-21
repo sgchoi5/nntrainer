@@ -15,7 +15,7 @@
 #define __CPU_BACKEND_H__
 #ifdef __cplusplus
 #if defined(__aarch64__) || defined(__ARM_ARCH_7A__) ||                        \
-  defined(__ANDROID__) || defined(__arm__) || defined(_M_ARM) ||               \
+  defined(__arm__) || defined(_M_ARM) ||                                        \
   defined(_M_ARM64)
 #include <arm_compute_backend.h>
 #define NNTR_CPU_HAS_Q6_K_Q8_K_DOT 1

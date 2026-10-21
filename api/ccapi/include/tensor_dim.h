@@ -30,6 +30,40 @@
 #define _FP16 ::nntrainer::Half
 #else
 #define _FP16 _Float16
+
+// _Float16 lacks standard library overloads for common math functions.
+// On ARM, __fp16 promotes to double for C math calls, but _Float16 (used on
+// x86_64 and Windows) does not — unqualified exp(x), log(x), etc. become
+// ambiguous. Provide inline overloads that forward to the float versions.
+#include <cmath>
+inline _Float16 exp(_Float16 x) {
+  return static_cast<_Float16>(std::exp(static_cast<float>(x)));
+}
+inline _Float16 log(_Float16 x) {
+  return static_cast<_Float16>(std::log(static_cast<float>(x)));
+}
+inline _Float16 sqrt(_Float16 x) {
+  return static_cast<_Float16>(std::sqrt(static_cast<float>(x)));
+}
+inline _Float16 tanh(_Float16 x) {
+  return static_cast<_Float16>(std::tanh(static_cast<float>(x)));
+}
+inline _Float16 sin(_Float16 x) {
+  return static_cast<_Float16>(std::sin(static_cast<float>(x)));
+}
+inline _Float16 cos(_Float16 x) {
+  return static_cast<_Float16>(std::cos(static_cast<float>(x)));
+}
+inline _Float16 pow(_Float16 x, _Float16 y) {
+  return static_cast<_Float16>(
+    std::pow(static_cast<float>(x), static_cast<float>(y)));
+}
+inline _Float16 pow(_Float16 x, int y) {
+  return static_cast<_Float16>(std::pow(static_cast<float>(x), y));
+}
+inline _Float16 erf(_Float16 x) {
+  return static_cast<_Float16>(std::erf(static_cast<float>(x)));
+}
 #endif
 #endif
 

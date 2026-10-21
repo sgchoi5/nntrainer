@@ -21,11 +21,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            // SampleTestAPP hosts the QuickDotAI AAR directly (no remote
-            // :remote process) so it packages the AAR's arm64-v8a
-            // jniLibs. Restrict to the matching ABI to avoid empty
-            // armv7/x86_64 slices.
-            abiFilters += listOf("arm64-v8a")
+            // Match the ABI of the QuickDotAI AAR's prebuilt CausalLM
+            // libraries.  Passed by build_android.sh via
+            // -PcausallmAbi=<abi>; defaults to arm64-v8a when invoked
+            // directly from Android Studio.
+            val causallmAbi =
+                providers.gradleProperty("causallmAbi")
+                    .orNull
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "arm64-v8a"
+            abiFilters += listOf(causallmAbi)
         }
     }
 

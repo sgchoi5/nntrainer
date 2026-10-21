@@ -49,9 +49,18 @@ val nntrainerNdkRevision =
             "Pkg.Revision is missing from $ndkSourcePropertiesFile"
         )
 
+// Target ABI — passed by build_android.sh via -PcausallmAbi=<abi>.
+// Defaults to arm64-v8a when invoked directly (e.g. from Android Studio).
+val causallmAbi =
+    providers.gradleProperty("causallmAbi")
+        .orNull
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: "arm64-v8a"
+
 // Sync transitive prebuilts into jniLibs, removing stale files.
 val prebuiltNativeLibsDir =
-    layout.buildDirectory.dir("generated/jniLibs/arm64-v8a")
+    layout.buildDirectory.dir("generated/jniLibs/$causallmAbi")
 
 val copyPrebuiltNativeLibs = tasks.register<Sync>("copyPrebuiltNativeLibs") {
     from(project.file("prebuilt_libs"))
@@ -77,8 +86,7 @@ android {
         minSdk = 33
 
         ndk {
-            // Only arm64-v8a is supported by the prebuilt CausalLM libraries.
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf(causallmAbi)
         }
 
         externalNativeBuild {

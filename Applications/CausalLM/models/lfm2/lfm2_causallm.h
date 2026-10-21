@@ -119,6 +119,17 @@ public:
                            std::vector<int> seed_tokens, bool do_sample,
                            bool log_output);
   /**
+   * @brief Bring the base Transformer::lookupEmbedding(int) const overload into
+   * this class scope.
+   *
+   * Lfm2CausalLM provides a different-signature lookupEmbedding(unsigned int)
+   * that would otherwise hide the base class virtual, triggering
+   * -Woverloaded-virtual (treated as error). This using-declaration un-hides
+   * it so both overloads coexist.
+   */
+  using Transformer::lookupEmbedding;
+
+  /**
    * @brief Look up the embedding vector for a given token ID.
    *
    * Supports FP32, Q4_0, and Q6_K embedding weight types.

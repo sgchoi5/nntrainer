@@ -61,7 +61,9 @@ nntrainer_root  = app_build_root / '..' / '..' / '..'
 # ── Find pre-built nntrainer libraries ──────────────────────────────────
 if is_android
   _nntr_result = nntrainer_root / 'builddir' / 'android_build_result'
-  _nntr_libdir = _nntr_result / 'lib' / 'arm64-v8a'
+  nntrainer_android_abi = meson.get_external_property(
+    'nntrainer_android_abi', 'arm64-v8a')
+  _nntr_libdir = _nntr_result / 'lib' / nntrainer_android_abi
   _nntr_incdir = _nntr_result / 'include' / 'nntrainer'
 
   nntrainer_abi_schema = meson.get_external_property(
@@ -186,7 +188,7 @@ endif
 
 # ── Tokenizer: platform-specific ────────────────────────────────────────
 if is_android
-  tokenizer_path = causallm_root / 'lib' / 'libtokenizers_android_c.a'
+  tokenizer_path = causallm_root / 'lib' / nntrainer_android_abi / 'libtokenizers_android_c.a'
 else
   tokenizer_path = causallm_root / 'lib' / 'libtokenizers_c.a'
 endif

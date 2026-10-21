@@ -3,3 +3,4 @@
 # dependency on QuickAI's tree). Re-include it: the nntrainer root .gitignore
 # ignores all *.in files.
 !android-aarch64.cross.in
+!android-x86_64.cross.in

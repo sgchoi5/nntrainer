@@ -5,3 +5,4 @@ nntrainer_abi_schema = 1
 nntrainer_abi_cflags = [@NNTRAINER_ABI_MESON_ARGS@]
 nntrainer_enable_fp16 = @NNTRAINER_ENABLE_FP16@
 nntrainer_arm_march = '@MESON_ARM_MARCH@'
+nntrainer_android_abi = '@TARGET_ABI@'

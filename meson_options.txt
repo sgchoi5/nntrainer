@@ -108,3 +108,7 @@ option('arm-arch', type: 'combo',
 option('arm-march', type: 'string',
        value: '',
        description: 'ARM march flag (e.g., "-march=armv8.2-a+fp16+dotprod+i8mm"). If empty, derived from arm-arch.')
+option('target-abi', type: 'combo',
+       choices: ['arm64-v8a', 'x86_64'],
+       value: 'arm64-v8a',
+       description: 'Target Android ABI for ndk-build output directory and prebuilt library path.')

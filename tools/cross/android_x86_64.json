@@ -1,0 +1,6 @@
+{
+    "arm_arch": "none",
+    "arm_march": "",
+    "enable_fp16": true,
+    "app_abi": "x86_64"
+}

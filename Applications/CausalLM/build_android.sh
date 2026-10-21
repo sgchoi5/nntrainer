@@ -11,6 +11,7 @@ Options:
   --app                   Also assemble the QuickDotAI AAR and sample APK
   --install               Push native artifacts; with --app, install the APK
   --qnn                   Build the QNN-enabled native/app variant (default: CPU-only)
+  --arch=ARCH             Target architecture: aarch64 or x86_64 (default: aarch64)
   --cache                 Reuse a compatible engine build; build on cache miss
   --clean                 Recreate the selected CausalLM build outputs
   --nntr-threads=N        Set the nntrainer compute thread count (default: 7)
@@ -33,6 +34,7 @@ ENABLE_QNN=false
 INSTALL=false
 BUILD_APP=false
 NNTR_THREADS="${NNTR_THREADS:-7}"
+TARGET_ARCH="aarch64"
 ENGINE_ARGS=()
 
 deprecated_option() {
@@ -63,6 +65,9 @@ while [[ $# -gt 0 ]]; do
         --nntr-threads=*)
             NNTR_THREADS="${1#*=}"
             ;;
+        --arch=*)
+            TARGET_ARCH="${1#*=}"
+            ;;
         --legacy-ndk|--native-only|--skip-gradle|--skip-install)
             echo "Error: $1 was removed by the single-graph build migration." >&2
             echo "Use no option for native, --app for AAR/APK, and --install for deployment." >&2
@@ -92,10 +97,30 @@ if ! [[ "$NNTR_THREADS" =~ ^[1-9][0-9]*$ ]]; then
     echo "Error: --nntr-threads must be a positive integer." >&2
     exit 2
 fi
+case "$TARGET_ARCH" in
+    aarch64)
+        TARGET_ABI="arm64-v8a"
+        SYSROOT_ARCH="aarch64-linux-android"
+        ;;
+    x86_64)
+        TARGET_ABI="x86_64"
+        SYSROOT_ARCH="x86_64-linux-android"
+        ;;
+    *)
+        echo "Error: --arch must be aarch64 or x86_64." >&2
+        exit 2
+        ;;
+esac
 if [[ "$ENABLE_QNN" == true ]]; then
     BUILD_VARIANT="qnn"
 else
     BUILD_VARIANT="cpu"
+fi
+
+# QNN is ARM-only; reject --qnn on non-aarch64 targets.
+if [[ "$ENABLE_QNN" == true && "$TARGET_ARCH" != "aarch64" ]]; then
+    echo "Error: --qnn is only supported on aarch64." >&2
+    exit 2
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -157,7 +182,7 @@ if [[ "$ANDROID_NDK_HOST" == "windows-x86_64" ]] && command -v cygpath >/dev/nul
     ANDROID_NDK_MESON="$(cygpath -m "$ANDROID_NDK")"
 fi
 
-GRADLE_NDK_ARG="-PnntrainerNdkPath=$ANDROID_NDK_MESON"
+GRADLE_NDK_ARGS=(-PnntrainerNdkPath="$ANDROID_NDK_MESON" -PcausallmAbi="$TARGET_ABI")
 
 QNN_SDK_ROOT_SHELL=""
 if [[ "$ENABLE_QNN" == true ]]; then
@@ -180,6 +205,7 @@ fi
 echo "=== nntrainer CausalLM Android build ==="
 echo "NNTRAINER_ROOT: $NNTRAINER_ROOT"
 echo "ANDROID_NDK:    $ANDROID_NDK"
+echo "Arch:           $TARGET_ARCH ($TARGET_ABI)"
 echo "Variant:        $BUILD_VARIANT"
 echo "App:            $BUILD_APP"
 echo "Install:        $INSTALL"
@@ -228,10 +254,10 @@ if [[ ! -f "$CAUSALLM_ROOT/json.hpp" ]]; then
     exit 1
 fi
 
-TOKENIZER="$CAUSALLM_ROOT/lib/libtokenizers_android_c.a"
+TOKENIZER="$CAUSALLM_ROOT/lib/$TARGET_ABI/libtokenizers_android_c.a"
 if [[ ! -f "$TOKENIZER" ]]; then
     echo "[2] Building the Android tokenizer library..."
-    "$CAUSALLM_ROOT/build_tokenizer_android.sh"
+    "$CAUSALLM_ROOT/build_tokenizer_android.sh" "$TARGET_ABI"
 fi
 if [[ ! -f "$TOKENIZER" ]]; then
     echo "Error: tokenizer build did not produce $TOKENIZER" >&2
@@ -239,7 +265,7 @@ if [[ ! -f "$TOKENIZER" ]]; then
 fi
 
 NNTRAINER_ANDROID_RESULT="$NNTRAINER_ROOT/builddir/android_build_result"
-NNTRAINER_ANDROID_LIBDIR="$NNTRAINER_ANDROID_RESULT/lib/arm64-v8a"
+NNTRAINER_ANDROID_LIBDIR="$NNTRAINER_ANDROID_RESULT/lib/$TARGET_ABI"
 NNTRAINER_ABI_FILE="$NNTRAINER_ANDROID_RESULT/nntrainer-abi.ini"
 NNTRAINER_PREBUILT_MK="$NNTRAINER_ANDROID_RESULT/Android.mk"
 NNTRAINER_MODE_FILE="$NNTRAINER_ANDROID_RESULT/causallm-build-mode.ini"
@@ -248,6 +274,7 @@ engine_mode_text() {
     # Schema 2 invalidates engines built with the former mmap-read override.
     printf 'schema=2\n'
     printf 'variant=%s\n' "$BUILD_VARIANT"
+    printf 'target_abi=%s\n' "$TARGET_ABI"
     printf 'enable_qnn=%s\n' "$ENABLE_QNN"
     printf 'nntr_threads=%s\n' "$NNTR_THREADS"
     printf 'android_ndk=%s\n' "$ANDROID_NDK"
@@ -335,6 +362,7 @@ else
         ./tools/package_android.sh \
             -Dnntr-num-threads="$NNTR_THREADS" \
             -Denable-npu="$ENABLE_QNN" \
+            -Dtarget-abi="$TARGET_ABI" \
             "${ENGINE_ARGS[@]}"
     )
     engine_mode_text > "$NNTRAINER_MODE_FILE"
@@ -347,9 +375,9 @@ fi
 
 # Keep machine files outside NATIVE_BUILD so Meson can wipe it safely.
 mkdir -p "$NATIVE_MACHINE_DIR"
-CROSS_FILE="$NATIVE_MACHINE_DIR/android-aarch64.cross"
+CROSS_FILE="$NATIVE_MACHINE_DIR/android-$TARGET_ARCH.cross"
 ABI_CROSS_FILE="$NATIVE_MACHINE_DIR/nntrainer-abi.ini"
-CROSS_FILE_IN="$CAUSALLM_ROOT/app_build/android-aarch64.cross.in"
+CROSS_FILE_IN="$CAUSALLM_ROOT/app_build/android-$TARGET_ARCH.cross.in"
 MACHINE_CHANGED=false
 
 rendered_cross="$(mktemp)"
@@ -433,8 +461,8 @@ LEGACY_ANDROID_MK_ARTIFACT_NAMES=(
 )
 legacy_artifact_removed=false
 for legacy_output_dir in \
-    "$CAUSALLM_ROOT/jni/libs/arm64-v8a" \
-    "$CAUSALLM_ROOT/jni/obj/local/arm64-v8a"; do
+    "$CAUSALLM_ROOT/jni/libs/$TARGET_ABI" \
+    "$CAUSALLM_ROOT/jni/obj/local/$TARGET_ABI"; do
     for file in "${LEGACY_ANDROID_MK_ARTIFACT_NAMES[@]}"; do
         if [[ -f "$legacy_output_dir/$file" ]]; then
             rm -f "$legacy_output_dir/$file"
@@ -447,7 +475,7 @@ if [[ "$legacy_artifact_removed" == true ]]; then
 fi
 
 PREBUILT_DIR="$CAUSALLM_ROOT/Android/QuickDotAI/prebuilt_libs"
-LIBCXX="$ANDROID_NDK/toolchains/llvm/prebuilt/$ANDROID_NDK_HOST/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+LIBCXX="$ANDROID_NDK/toolchains/llvm/prebuilt/$ANDROID_NDK_HOST/sysroot/usr/lib/$SYSROOT_ARCH/libc++_shared.so"
 NATIVE_EXECUTABLES=(
     "$NATIVE_BUILD/nntr_causallm"
     "$NATIVE_BUILD/quick_dot_ai_test"
@@ -567,7 +595,7 @@ if [[ "$BUILD_APP" == true ]]; then
     echo "[7] Assembling the QuickDotAI AAR and sample APK."
     (
         cd "$CAUSALLM_ROOT/Android"
-        ./gradlew "$GRADLE_NDK_ARG" \
+        ./gradlew "${GRADLE_NDK_ARGS[@]}" \
             :QuickDotAI:assembleDebug :SampleTestAPP:assembleDebug
     )
     AAR="$CAUSALLM_ROOT/Android/QuickDotAI/build/outputs/aar/QuickDotAI-debug.aar"

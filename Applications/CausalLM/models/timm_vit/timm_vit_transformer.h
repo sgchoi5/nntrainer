@@ -41,6 +41,17 @@ public:
 
 public:
   /**
+   * @brief Bring the base Transformer virtual overloads into this class scope.
+   *
+   * TimmViT provides ViT-specific 2-param createAttention / createMlp overloads
+   * that would otherwise hide the base class virtuals, triggering
+   * -Woverloaded-virtual (treated as error). These using-declarations un-hide
+   * them so both overload sets coexist.
+   */
+  using Transformer::createAttention;
+  using Transformer::createMlp;
+
+  /**
    * @brief Create patch embedding layers for an input image tensor.
    */
   Tensor createPatchEmbed(Tensor input);

@@ -7,7 +7,7 @@ if get_option('debug')
 endif
 
 # Architecture flags: applied based on platform (decoupled from enable-fp16)
-if get_option('platform') == 'android'
+if get_option('platform') == 'android' and get_option('target-abi') == 'arm64-v8a'
   arm_march_flag = get_option('arm-march')
   if arm_march_flag == ''
     # Fallback: derive from arm-arch (for builds without --arm-arch argument)
@@ -21,6 +21,9 @@ if get_option('platform') == 'android'
   if arm_march_flag != ''
     flags += arm_march_flag
   endif
+elif get_option('platform') == 'android' and get_option('target-abi') == 'x86_64'
+  # x86_64 Android: enable AVX2/FMA/F16C for hardware acceleration
+  flags += ['-mavx2', '-mfma', '-mf16c']
 endif
 
 flags += '-O@0@'.format(get_option('optimization'))
@@ -36,6 +39,10 @@ and_conf.set('MESON_NNTRAINER_INCS', ' '.join(nntrainer_inc_abs))
 and_conf.set('MESON_CCAPI_NNTRAINER_SRCS', ' '.join(ccapi_src))
 and_conf.set('MESON_CCAPI_NNTRAINER_INCS', ' '.join(ccapi_inc_abs))
 and_conf.set('MESON_ARM_MARCH', arm_march_flag)
+
+# Target Android ABI (controls ndk-build APP_ABI and the output directory name).
+target_abi = get_option('target-abi')
+and_conf.set('TARGET_ABI', target_abi)
 
 # ABI-affecting defines exported to prebuilt consumers via Android-prebuilt.mk.
 # A define belongs here when it changes what an *installed* header declares, so
@@ -63,6 +70,9 @@ endforeach
 nntrainer_abi_flags = []
 if arm_march_flag != ''
   nntrainer_abi_flags += arm_march_flag
+endif
+if get_option('platform') == 'android' and get_option('target-abi') == 'x86_64'
+  nntrainer_abi_flags += ['-mavx2', '-mfma', '-mf16c']
 endif
 nntrainer_abi_flags += nntrainer_abi_defines
 
@@ -135,8 +145,10 @@ endif
 
 if blas_dep.found()
   and_conf.set('MESON_BLAS_ROOT', blas_root)
+  and_conf.set('MESON_HAS_OPENBLAS', 1)
 else
-  error('blas is needed for the android build')
+  and_conf.set('MESON_HAS_OPENBLAS', 0)
+  message('BLAS not found; building without OpenBLAS (non-BLAS fallback)')
 endif
 
 # ml-api is only prepared when capi is enabled (see meson.build); when absent,
@@ -159,6 +171,17 @@ else
   and_conf.set('MESON_QNN_INCS', '')
 endif
 
+# AVX-VNNI dispatch: compiled as a separate static library with -mavxvnni
+# so the flag never reaches code that runs on AVX2-only CPUs.
+if enable_avxvnni_dispatch
+  and_conf.set('MESON_HAS_AVXVNNI', 1)
+  avxvnni_src = meson.source_root() / 'nntrainer/tensor/cpu_backend/ggml_interface/nntr_ggml_impl/nntr_ggml_impl_avxvnni.cpp'
+  and_conf.set('MESON_AVXVNNI_SRCS', avxvnni_src)
+else
+  and_conf.set('MESON_HAS_AVXVNNI', 0)
+  and_conf.set('MESON_AVXVNNI_SRCS', '')
+endif
+
 configure_file(input: 'Android.mk.in', output: 'Android.mk',
   configuration: and_conf
 )
@@ -177,14 +200,14 @@ nntrainer_abi_file = configure_file(input: 'nntrainer-abi.ini.template',
 
 install_data(nntrainer_abi_file, install_dir: nntrainer_prefix)
 
-configure_file(input: 'Application.mk', output: 'Application.mk',
-  copy: true
+configure_file(input: 'Application.mk.in', output: 'Application.mk',
+  configuration: and_conf
 )
 
 # below is list of file that meson acknowledges this is the output of custom target so that
 # this has to be installed by meson
 outputs= [
-  'arm64-v8a'
+  target_abi
 ]
 
 
